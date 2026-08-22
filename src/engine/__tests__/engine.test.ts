@@ -9,7 +9,7 @@ describe('Trade Tariff Calculator engine — validated against Flexport simulato
       valueUsd: 100000,
       transport: 'OCEAN',
     });
-    expect(r.base).toMatchObject({ code: '7601106090', rateDescription: 'Free', amount: 0 });
+    expect(r.base).toMatchObject({ code: '7601.10.60.90', rateDescription: 'Free', amount: 0 });
     expect(r.surtaxLines.map(l => l.code)).toEqual(['99030590', '99038202']);
     expect(r.surtaxLines[1].amount).toBe(50000);
     expect(r.totalDuties).toBe(50000);
@@ -54,7 +54,7 @@ describe('Trade Tariff Calculator engine — validated against Flexport simulato
       units: { KG: 5566 },
       transport: 'OCEAN',
     });
-    expect(r.base).toMatchObject({ code: '0804508040', rateDescription: '1.5¢/kg', amount: 83 });
+    expect(r.base).toMatchObject({ code: '0804.50.80.40', rateDescription: '1.5¢/kg', amount: 83 });
     expect(r.surtaxLines.map(l => l.code)).toEqual(['99030586']);
     expect(r.totalDuties).toBe(83);
     expect(r.hmf).toBe(13);
@@ -100,5 +100,19 @@ describe('Trade Tariff Calculator engine — validated against Flexport simulato
     expect(r.surtaxLines[0].amount).toBe(12500);
     expect(r.totalDuties).toBe(14500);
     expect(r.hmf).toBe(0);
+  });
+
+  test('Turkey cotton t-shirts 6109.10.00.40, 16.5% base + FL 12.5% (probed)', () => {
+    const r = calculate({
+      code: '6109100040',
+      country: 'TR',
+      entryDate: '2026-08-22',
+      valueUsd: 100000,
+      transport: 'AIR',
+    });
+    expect(r.base).toMatchObject({ code: '6109.10.00.40', amount: 16500 });
+    expect(r.surtaxLines.map(l => l.code)).toEqual(['99030579']);
+    expect(r.surtaxLines[0].amount).toBe(12500);
+    expect(r.totalDuties).toBe(29000);
   });
 });

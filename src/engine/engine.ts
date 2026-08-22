@@ -1,10 +1,11 @@
 // Trade Tariff Calculator engine.
 // Mirrors the Flexport simulator for standard scenarios, validated case by case.
 
-import { BaseRate, CalcInput, CalcResult, ResultLine, Scope, TariffRule } from './types';
+import { CalcInput, CalcResult, ResultLine, Scope, TariffRule } from './types';
 import { computeHmf, computeMpf } from './fees';
 import { RULES, FL_SECTION232_EXCLUSION_COUNTRIES } from './rules';
-import { BASE_RATES, NOTE_52B_MAX_BASE_DUTY } from './baseRates';
+import { NOTE_52B_MAX_BASE_DUTY } from './baseRates';
+import { formatHts, getBaseRate, HtsBaseRate } from './htsDb';
 
 function inScope(scope: Scope, country: string): boolean {
   switch (scope.type) {
@@ -59,17 +60,39 @@ function productMatches(rule: TariffRule, code: string): boolean {
   return !ps.chapters && !ps.headings;
 }
 
-function computeBase(input: CalcInput, rate: BaseRate): { amount: number; rateValue: number } {
-  if (rate.kind === 'adValorem') {
-    return { amount: input.valueUsd * (rate.rate ?? 0), rateValue: rate.rate ?? 0 };
+function computeBase(input: CalcInput, rate: HtsBaseRate): { amount: number; rateValue: number } {
+  switch (rate.kind) {
+    case 'free':
+    case 'text':
+      return { amount: 0, rateValue: 0 };
+    case 'adv':
+      return { amount: input.valueUsd * rate.rate, rateValue: rate.rate };
+    case 'spec':
+      return { amount: (rate.centsPerUnit / 100) * quantityInUnit(input, rate.unit), rateValue: 0 };
+    case 'compound':
+      return {
+        amount:
+          input.valueUsd * rate.rate + (rate.centsPerUnit / 100) * quantityInUnit(input, rate.unit),
+        rateValue: rate.rate,
+      };
   }
-  // specific duty: cents per unit
-  const qty = input.units?.[rate.unit ?? 'KG'] ?? 0;
-  return { amount: ((rate.centsPerUnit ?? 0) / 100) * qty, rateValue: 0 };
+}
+
+function quantityInUnit(input: CalcInput, unit?: string): number {
+  if (!unit || !input.units) {
+    return 0;
+  }
+  const target = unit.toLowerCase();
+  for (const [key, value] of Object.entries(input.units)) {
+    if (key.toLowerCase() === target) {
+      return value;
+    }
+  }
+  return 0;
 }
 
 export function calculate(input: CalcInput): CalcResult {
-  const rate = BASE_RATES[input.code];
+  const rate = getBaseRate(input.code);
   if (!rate) {
     throw new Error(`No base rate data for HTS code ${input.code}`);
   }
@@ -79,9 +102,9 @@ export function calculate(input: CalcInput): CalcResult {
   // 1) Base duty line
   const baseCalc = computeBase(input, rate);
   const baseLine: ResultLine = {
-    code: input.code,
-    label: input.code,
-    rateDescription: rate.description,
+    code: formatHts(input.code),
+    label: formatHts(input.code),
+    rateDescription: rate.raw || 'Free',
     amount: Math.round(baseCalc.amount),
   };
 
@@ -94,9 +117,12 @@ export function calculate(input: CalcInput): CalcResult {
 
   // Note 52(b): low-duty products (specific duty, or ad valorem below the
   // threshold) are exempt from the forced-labor Section 301.
+  const advRate =
+    rate.kind === 'adv' || rate.kind === 'compound' ? rate.rate : 0;
   const baseIsLowDuty =
-    rate.kind === 'specific' ||
-    (rate.kind === 'adValorem' && (rate.rate ?? 0) <= NOTE_52B_MAX_BASE_DUTY);
+    rate.kind === 'spec' ||
+    rate.kind === 'free' ||
+    (rate.kind === 'adv' && advRate <= NOTE_52B_MAX_BASE_DUTY);
 
   // First pass: detect Section 232 application and exclusion triggers.
   const applicable = RULES.filter(
