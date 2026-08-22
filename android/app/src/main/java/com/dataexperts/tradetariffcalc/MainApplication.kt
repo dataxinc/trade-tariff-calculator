@@ -1,4 +1,4 @@
-package com.tradetariffcalculator
+package com.dataexperts.tradetariffcalc
 
 import android.app.Application
 import com.facebook.react.PackageList
