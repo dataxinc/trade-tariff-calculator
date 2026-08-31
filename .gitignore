@@ -33,7 +33,8 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
-# Release signing: commit the .p12 (private repo) but never the passwords
+*.p12
+# Release signing: keystore + passwords live only on the build machine (Windows)
 keystore.properties
 .kotlin/
 

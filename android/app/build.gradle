@@ -5,13 +5,18 @@ apply plugin: "com.facebook.react"
 /**
  * Release signing.
  *
- * Passwords come from android/keystore.properties (kept out of git). The
- * keystore file android/app/trade-tariff-calc-upload.p12 is committed to the
- * private repo so a Windows pull can build a release-signed AAB directly.
+ * Passwords come from android/keystore.properties (git-ignored). Create that
+ * file on the build machine (Windows) pointing at your own release keystore,
+ * e.g.:
+ *   storeFile=app/trade-tariff-upload.keystore
+ *   storePassword=...
+ *   keyPassword=...
+ *   keyAlias=...
+ *   storeType=jks
  *
  * Build the release AAB with:
  *   cd android && ./gradlew bundleRelease
- * (Windows: use bundleRelease.bat / gradlew.bat)
+ * (Windows: use gradlew.bat)
  *
  * If keystore.properties is missing the release build fails fast rather than
  * silently falling back to debug signing (that was the bug that produced a
