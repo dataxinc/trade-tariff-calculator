@@ -115,4 +115,59 @@ describe('Trade Tariff Calculator engine — validated against Flexport simulato
     expect(r.surtaxLines[0].amount).toBe(12500);
     expect(r.totalDuties).toBe(29000);
   });
+
+  test('Germany sedan 8703.23.01: Section 232 autos 25% on top of 2.5% base', () => {
+    const r = calculate({
+      code: '87032301',
+      country: 'DE',
+      entryDate: '2026-08-31',
+      valueUsd: 40000,
+      transport: 'OCEAN',
+    });
+    expect(r.base).toMatchObject({ amount: 1000 });
+    const auto = r.surtaxLines.find(l => l.code === '99039401');
+    expect(auto?.amount).toBe(10000);
+    expect(r.totalDuties).toBe(11000);
+  });
+
+  test('China laptop 8471.30.01.00: auto parts 25%, 301 China list excluded (README-confirmed)', () => {
+    const r = calculate({
+      code: '8471300100',
+      country: 'CN',
+      entryDate: '2026-08-31',
+      valueUsd: 40000,
+      transport: 'AIR',
+    });
+    expect(r.base).toMatchObject({ code: '8471.30.01.00', amount: 0 });
+    const auto = r.surtaxLines.find(l => l.code === '99039405');
+    expect(auto?.amount).toBe(10000);
+    // 8471 is excluded from the China 301 list (phones/laptops carve-out)
+    expect(r.surtaxLines.some(l => l.code === '99039101')).toBe(false);
+    expect(r.totalDuties).toBe(10000);
+  });
+
+  test('Japan transmission 8708.40.11: auto parts 25%', () => {
+    const r = calculate({
+      code: '87084011',
+      country: 'JP',
+      entryDate: '2026-08-31',
+      valueUsd: 40000,
+      transport: 'AIR',
+    });
+    const auto = r.surtaxLines.find(l => l.code === '99039405');
+    expect(auto?.amount).toBe(10000);
+    expect(r.totalDuties).toBe(10000);
+  });
+
+  test('Single-axle tractor 8701.10.00.10 (Ch 87, not in auto annex): no auto tariff', () => {
+    const r = calculate({
+      code: '8701100100',
+      country: 'DE',
+      entryDate: '2026-08-31',
+      valueUsd: 40000,
+      transport: 'AIR',
+    });
+    expect(r.surtaxLines.some(l => l.code === '99039401')).toBe(false);
+    expect(r.surtaxLines.some(l => l.code === '99039405')).toBe(false);
+  });
 });
